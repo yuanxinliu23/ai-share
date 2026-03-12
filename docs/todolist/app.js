@@ -1,4 +1,5 @@
 const STORAGE_KEY = "todolist:v2";
+const SEED_STATE_KEY = "todolist:seed:workbook1:v1";
 const AI_CONFIG_KEY = "todolist:ai-config:v1";
 const DEFAULT_AI_CONFIG = {
   apiKey: "",
@@ -67,6 +68,249 @@ const DEFAULT_PROJECTS = [
   "功能扩量",
   "数据建设",
   "其他",
+];
+
+const DEFAULT_TODO_SEED = [
+  {
+    title: "图片理解能力优化",
+    project: "原子能力建设",
+    notes: "",
+    dueDate: null,
+    priority: "high",
+    mode: "collab",
+    partner: "算法，评测外包",
+    completed: false,
+  },
+  {
+    title: "商品理解能力优化",
+    project: "原子能力建设",
+    notes: "",
+    dueDate: null,
+    priority: "high",
+    mode: "collab",
+    partner: "算法，评测外包",
+    completed: false,
+  },
+  {
+    title: "商详分析方案维度定义",
+    project: "原子能力建设",
+    notes: "",
+    dueDate: null,
+    priority: "high",
+    mode: "collab",
+    partner: "算法，产品",
+    completed: false,
+  },
+  {
+    title: "商详优化方案维度定义",
+    project: "原子能力建设",
+    notes: "",
+    dueDate: null,
+    priority: "high",
+    mode: "collab",
+    partner: "算法，产品",
+    completed: false,
+  },
+  {
+    title: "联系工厂型商家共创",
+    project: "原子能力建设",
+    notes: "",
+    dueDate: "2026-03-13",
+    priority: "high",
+    mode: "solo",
+    partner: "",
+    completed: true,
+  },
+  {
+    title: "不同模版的设计规范",
+    project: "功能上线",
+    notes: "",
+    dueDate: "2026-03-13",
+    priority: "high",
+    mode: "waiting",
+    partner: "买家设计师，前端",
+    completed: true,
+  },
+  {
+    title: "api渠道联系服务商（外贸大师）确认灰度",
+    project: "功能扩量",
+    notes: "",
+    dueDate: "2026-03-09",
+    priority: "high",
+    mode: "solo",
+    partner: "",
+    completed: true,
+  },
+  {
+    title: "api渠道联系服务商（倚天剑）确认灰度",
+    project: "功能扩量",
+    notes: "",
+    dueDate: "2026-03-10",
+    priority: "high",
+    mode: "solo",
+    partner: "",
+    completed: false,
+  },
+  {
+    title: "api渠道联系服务商（店小秘）确认灰度",
+    project: "功能扩量",
+    notes: "",
+    dueDate: "2026-03-12",
+    priority: "high",
+    mode: "solo",
+    partner: "",
+    completed: false,
+  },
+  {
+    title: "api渠道一期名单开灰",
+    project: "功能扩量",
+    notes: "",
+    dueDate: "2026-03-09",
+    priority: "high",
+    mode: "collab",
+    partner: "后端",
+    completed: true,
+  },
+  {
+    title: "api渠道二期名单开灰",
+    project: "功能扩量",
+    notes: "",
+    dueDate: "2026-03-10",
+    priority: "high",
+    mode: "collab",
+    partner: "后端",
+    completed: true,
+  },
+  {
+    title: "api渠道三期名单开灰",
+    project: "功能扩量",
+    notes: "",
+    dueDate: "2026-03-11",
+    priority: "high",
+    mode: "collab",
+    partner: "后端",
+    completed: true,
+  },
+  {
+    title: "excel渠道灰度",
+    project: "功能扩量",
+    notes: "",
+    dueDate: "2026-03-10",
+    priority: "high",
+    mode: "collab",
+    partner: "后端",
+    completed: true,
+  },
+  {
+    title: "excel渠道全量",
+    project: "功能扩量",
+    notes: "",
+    dueDate: "2026-03-11",
+    priority: "high",
+    mode: "collab",
+    partner: "后端",
+    completed: true,
+  },
+  {
+    title: "海报物料准备",
+    project: "宣发",
+    notes: "完成后过审核",
+    dueDate: "2026-03-12",
+    priority: "medium",
+    mode: "waiting",
+    partner: "生意助手外包",
+    completed: true,
+  },
+  {
+    title: "gif物料准备",
+    project: "宣发",
+    notes: "完成后过审核",
+    dueDate: "2026-03-12",
+    priority: "medium",
+    mode: "waiting",
+    partner: "创意外包",
+    completed: true,
+  },
+  {
+    title: "中西部大区直播准备",
+    project: "宣发",
+    notes: "",
+    dueDate: "2026-03-11",
+    priority: "high",
+    mode: "solo",
+    partner: "",
+    completed: true,
+  },
+  {
+    title: "二期宣发ppt制作",
+    project: "宣发",
+    notes: "完成后过审核",
+    dueDate: "2026-03-11",
+    priority: "high",
+    mode: "solo",
+    partner: "",
+    completed: true,
+  },
+  {
+    title: "数据底表新增二期字段",
+    project: "数据建设",
+    notes: "",
+    dueDate: null,
+    priority: "low",
+    mode: "waiting",
+    partner: "数仓",
+    completed: true,
+  },
+  {
+    title: "数据看板新增二期字段",
+    project: "数据建设",
+    notes: "",
+    dueDate: null,
+    priority: "low",
+    mode: "solo",
+    partner: "",
+    completed: false,
+  },
+  {
+    title: "周会分享内容准备",
+    project: "其他",
+    notes: "提前下载文件到工作电脑",
+    dueDate: "2026-03-13",
+    priority: "medium",
+    mode: "solo",
+    partner: "",
+    completed: true,
+  },
+  {
+    title: "走查定招链路发品情况",
+    project: "功能扩量",
+    notes: "",
+    dueDate: null,
+    priority: "medium",
+    mode: "solo",
+    partner: "",
+    completed: true,
+  },
+  {
+    title: "按期收集&开灰二期灰度商家",
+    project: "功能扩量",
+    notes: "",
+    dueDate: null,
+    priority: "low",
+    mode: "collab",
+    partner: "后端",
+    completed: true,
+  },
+  {
+    title: "对商钉群直播准备",
+    project: "宣发",
+    notes: "",
+    dueDate: null,
+    priority: "medium",
+    mode: "solo",
+    partner: "",
+    completed: true,
+  },
 ];
 
 const priorityRank = {
@@ -143,6 +387,41 @@ const normalizeTodo = (todo) => ({
   createdAt: Number(todo.createdAt || Date.now()),
   completedAt: todo.completedAt ? Number(todo.completedAt) : null,
 });
+
+const buildSeedTodos = () => {
+  const baseCreatedAt = Date.parse("2026-03-07T09:00:00");
+
+  return DEFAULT_TODO_SEED.map((seed, index) => {
+    const createdAt = baseCreatedAt + index * 2 * 60 * 60 * 1000;
+    let completedAt = null;
+
+    if (seed.completed) {
+      completedAt = seed.dueDate
+        ? Date.parse(`${seed.dueDate}T18:00:00`)
+        : createdAt + 60 * 60 * 1000;
+    }
+
+    return normalizeTodo({
+      ...seed,
+      id: crypto.randomUUID(),
+      createdAt,
+      completedAt,
+    });
+  });
+};
+
+const hydrateTodosWithSeed = (loadedTodos) => {
+  const hasSeeded = localStorage.getItem(SEED_STATE_KEY) === "1";
+  if (hasSeeded) return loadedTodos;
+
+  const existingTitles = new Set(loadedTodos.map((todo) => todo.title.trim()));
+  const seedTodos = buildSeedTodos().filter((todo) => !existingTitles.has(todo.title.trim()));
+  const mergedTodos = [...seedTodos, ...loadedTodos];
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedTodos));
+  localStorage.setItem(SEED_STATE_KEY, "1");
+  return mergedTodos;
+};
 
 const saveTodos = () => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
@@ -836,7 +1115,7 @@ clearAiConfigBtn.addEventListener("click", () => {
 });
 
 const init = () => {
-  todos = loadTodos();
+  todos = hydrateTodosWithSeed(loadTodos());
   aiConfig = loadAiConfig();
   updateProjectSelects(projectOptions[0], projectOptions[0]);
   renderAiConfig();
