@@ -1,0 +1,1684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Agent 的机制和实践</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" />
+  <style>
+    /* ===========================================
+       === TOKENS ===
+       =========================================== */
+    :root {
+      --bg-0: #f6f9ff;
+      --bg-1: #edf3fd;
+      --bg-2: #e5eefb;
+      --text: #172332;
+      --muted: #60718a;
+      --line: rgba(23, 50, 95, 0.13);
+      --panel: rgba(255, 255, 255, 0.96);
+      --panel-soft: rgba(250, 252, 255, 0.9);
+      --accent: #2f6bff;
+      --accent-strong: #1b468f;
+      --accent-ok: #1f8c60;
+      --danger: #d34a4a;
+      --shadow: 0 14px 34px rgba(23, 35, 50, 0.09);
+
+      --title-size: clamp(2.1rem, 6.4vw, 5.2rem);
+      --h2-size: clamp(1.45rem, 3.5vw, 2.45rem);
+      --h3-size: clamp(1.05rem, 2.1vw, 1.45rem);
+      --body-size: clamp(0.86rem, 1.2vw, 1rem);
+      --small-size: clamp(0.74rem, 0.95vw, 0.9rem);
+      --slide-padding: clamp(1.05rem, 3.8vw, 3.2rem);
+      --content-gap: clamp(0.75rem, 1.35vw, 1.2rem);
+      --element-gap: clamp(0.45rem, 0.9vh, 0.78rem);
+
+      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+      --duration-normal: 0.55s;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: "Noto Sans SC", sans-serif;
+      color: var(--text);
+      background: #e7edf7;
+      line-height: 1.6;
+      word-break: keep-all;
+      text-wrap: pretty;
+    }
+
+    /* ===========================================
+       === VIEWPORT BASE (frontend-slides required) ===
+       =========================================== */
+    html, body {
+      height: 100%;
+      overflow-x: hidden;
+    }
+
+    html {
+      scroll-snap-type: y mandatory;
+      scroll-behavior: smooth;
+    }
+
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background: linear-gradient(165deg, var(--bg-0) 0%, var(--bg-1) 56%, var(--bg-2) 100%);
+    }
+
+    .slide-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      max-height: 100%;
+      overflow: hidden;
+      padding: var(--slide-padding);
+      width: min(1240px, 100%);
+      margin: 0 auto;
+      gap: var(--content-gap);
+    }
+
+    .card, .container, .content-box {
+      max-width: min(94vw, 1140px);
+      max-height: min(80vh, 700px);
+    }
+
+    .feature-list, .bullet-list {
+      gap: clamp(0.4rem, 1vh, 1rem);
+    }
+
+    .feature-list li, .bullet-list li {
+      font-size: var(--body-size);
+      line-height: 1.45;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+      gap: clamp(0.5rem, 1.5vw, 1rem);
+    }
+
+    img, .image-container {
+      max-width: 100%;
+      max-height: min(50vh, 400px);
+      object-fit: contain;
+    }
+
+    @media (max-height: 700px) {
+      :root {
+        --slide-padding: clamp(0.75rem, 3vw, 2rem);
+        --title-size: clamp(1.7rem, 5vw, 3.4rem);
+        --h2-size: clamp(1.2rem, 3vw, 1.9rem);
+        --body-size: clamp(0.8rem, 1.1vw, 0.95rem);
+      }
+    }
+
+    @media (max-height: 600px) {
+      :root {
+        --slide-padding: clamp(0.55rem, 2.4vw, 1.35rem);
+        --body-size: clamp(0.72rem, 0.96vw, 0.88rem);
+      }
+      .nav-dots, .keyboard-hint, .decorative {
+        display: none;
+      }
+    }
+
+    @media (max-width: 980px) {
+      .cols-2, .cols-3, .role-grid, .lobster-wrap {
+        grid-template-columns: 1fr !important;
+      }
+      .flow, .react-diagram, .paper-diagram {
+        grid-template-columns: 1fr 1fr !important;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.2s !important;
+      }
+      html { scroll-behavior: auto; }
+    }
+
+    /* ===========================================
+       === TYPOGRAPHY ===
+       =========================================== */
+    h1, h2, h3 {
+      font-family: "Noto Sans SC", sans-serif;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+      color: #142d58;
+    }
+    h1 { font-size: var(--title-size); font-weight: 900; }
+    h2 { font-size: var(--h2-size); font-weight: 800; }
+    h3 { font-size: var(--h3-size); font-weight: 700; }
+
+    p, li, td, th, a, span {
+      font-size: var(--body-size);
+      color: var(--text);
+      line-height: 1.62;
+    }
+
+    .muted { color: var(--muted); }
+
+    .slide-number {
+      position: absolute;
+      top: clamp(0.65rem, 1.2vw, 0.95rem);
+      right: clamp(0.65rem, 1.2vw, 0.95rem);
+      font-size: var(--small-size);
+      letter-spacing: 0.08em;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.22rem 0.56rem;
+      z-index: 6;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: clamp(0.92rem, 1.3vw, 1.2rem);
+      overflow: hidden;
+    }
+
+    .panel-soft {
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: clamp(0.72rem, 1.05vw, 0.92rem);
+    }
+
+    .tag {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid rgba(47,107,255,0.3);
+      background: rgba(255,255,255,0.95);
+      color: #2e59a3;
+      font-size: var(--small-size);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 0.2rem 0.55rem;
+      text-transform: uppercase;
+    }
+
+    .bullet-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: clamp(0.45rem, 0.9vh, 0.72rem);
+      margin-top: clamp(0.52rem, 1.1vh, 0.86rem);
+    }
+    .bullet-list li {
+      display: grid;
+      grid-template-columns: 0.95rem 1fr;
+      gap: 0.4rem;
+      align-items: start;
+    }
+    .bullet-list li::before {
+      content: "●";
+      color: var(--accent);
+      font-size: var(--small-size);
+      margin-top: 0.2rem;
+    }
+
+    .cols-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(1rem, 1.6vw, 1.35rem);
+      align-items: stretch;
+    }
+
+    .cols-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: clamp(0.84rem, 1.2vw, 1.06rem);
+      align-items: stretch;
+    }
+
+    /* ===========================================
+       === SPECIAL BLOCKS ===
+       =========================================== */
+    .cover {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+    }
+    .cover h1 {
+      color: #2f5f9f;
+      font-size: clamp(2.25rem, 7vw, 6rem);
+    }
+    .bio {
+      margin-top: 0.55rem;
+      font-size: clamp(1rem, 1.45vw, 1.3rem);
+      color: #5d7090;
+      font-weight: 700;
+    }
+
+    .lobster-wrap {
+      display: grid;
+      grid-template-columns: clamp(180px, 22vw, 260px) 1fr;
+      gap: clamp(1rem, 1.8vw, 1.35rem);
+      align-items: center;
+      margin-top: 0.25rem;
+    }
+
+    .lobster-card {
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.97);
+      min-height: clamp(210px, 34vh, 290px);
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      padding: 0.8rem;
+      text-align: center;
+    }
+    .lobster-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(23,35,50,0.12);
+    }
+    .lobster-card img {
+      width: clamp(74px, 7vw, 106px);
+      height: auto;
+    }
+
+    .lobster-step {
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      pointer-events: none;
+    }
+    .lobster-step.show {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .role-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(280px, 1fr));
+      gap: clamp(0.95rem, 1.35vw, 1.2rem);
+      margin-top: 0.25rem;
+    }
+
+    .chip {
+      display: inline-block;
+      border-radius: 999px;
+      border: 1px solid rgba(47,107,255,0.3);
+      background: rgba(245,249,255,0.98);
+      color: #2d579f;
+      padding: 0.2rem 0.55rem;
+      font-size: var(--small-size);
+      font-weight: 700;
+      margin-bottom: 0.45rem;
+    }
+
+    .title-action {
+      border: 0;
+      background: linear-gradient(135deg, #2f6bff, #1f4f9f);
+      color: #fff;
+      font-size: 0.9em;
+      font-weight: 800;
+      border-radius: 999px;
+      padding: 0.12em 0.6em;
+      cursor: pointer;
+      margin: 0 0.12em;
+      box-shadow: 0 8px 16px rgba(47,107,255,0.24);
+      vertical-align: middle;
+    }
+    .title-action:hover {
+      transform: translateY(-1px);
+    }
+
+    .pill-btn {
+      border-radius: 999px;
+      border: 1px solid rgba(47,107,255,0.35);
+      background: rgba(255,255,255,0.98);
+      color: #2f5ea8;
+      font-size: var(--body-size);
+      font-weight: 700;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .pill-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 16px rgba(47,107,255,0.16);
+    }
+
+    .process-board {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.95);
+      padding: 1.9rem 1rem 1rem 1rem;
+      margin-top: 0.7rem;
+      position: relative;
+    }
+
+    .process-row {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+      gap: 0.45rem;
+      align-items: center;
+      position: relative;
+    }
+
+    .pnode {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.45rem 0.5rem;
+      text-align: center;
+      background: rgba(255,255,255,0.98);
+      color: #2b4a7f;
+      font-size: var(--small-size);
+      font-weight: 700;
+      opacity: 0;
+      transform: scale(0.96);
+      transition: opacity 0.25s ease, transform 0.25s ease, background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+    .pnode.show {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .pnode.active {
+      background: #635bff;
+      color: #fff;
+      border-color: #635bff;
+    }
+
+    .pline {
+      width: clamp(22px, 3vw, 34px);
+      height: 3px;
+      background: #8f89ff;
+      opacity: 0;
+      border-radius: 999px;
+      transition: opacity 0.25s ease;
+      justify-self: center;
+    }
+    .pline.show { opacity: 1; }
+
+    .process-loop {
+      position: absolute;
+      top: 0.38rem;
+      left: 12.5%;
+      width: 75%;
+      height: 1.05rem;
+      border-top: 3px dashed #635bff;
+      border-left: 3px dashed #635bff;
+      border-right: 3px dashed #635bff;
+      border-radius: 12px;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+    .process-loop::after {
+      content: "↙";
+      position: absolute;
+      left: -0.62rem;
+      bottom: -0.8rem;
+      color: #635bff;
+      font-weight: 800;
+      font-size: 0.95rem;
+    }
+    .process-loop.show { opacity: 1; }
+
+    .process-return {
+      margin-top: 0.35rem;
+      display: flex;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      color: #4f46e5;
+      font-size: var(--small-size);
+      font-weight: 700;
+    }
+    .process-return.show { opacity: 1; }
+    .process-notes {
+      margin-top: 0.8rem;
+      display: grid;
+      gap: 0.5rem;
+    }
+    .process-note {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(248, 252, 255, 0.96);
+      padding: 0.42rem 0.62rem;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      display: none;
+    }
+    .process-note.show {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .process-note h4 {
+      font-size: var(--small-size);
+      color: #4f46e5;
+      margin-bottom: 0.1rem;
+      line-height: 1.3;
+    }
+
+    .process-note .mini-tag {
+      display: inline-block;
+      font-size: 0.68rem;
+      color: #fff;
+      background: linear-gradient(135deg, #635bff, #3d74ff);
+      border-radius: 999px;
+      padding: 0.09rem 0.42rem;
+      margin-bottom: 0.18rem;
+      letter-spacing: 0.02em;
+    }
+    .process-note p {
+      font-size: clamp(0.78rem, 0.92vw, 0.88rem);
+      line-height: 1.45;
+    }
+    .process-layout {
+      justify-content: flex-start;
+      padding-top: clamp(1.3rem, 2.4vh, 1.95rem);
+    }
+
+    .compare-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.98);
+      margin-top: 0.82rem;
+    }
+    .compare-table thead th {
+      background: rgba(47,107,255,0.12);
+      color: #1c3e78;
+      font-weight: 800;
+      vertical-align: middle;
+    }
+    .compare-table th,
+    .compare-table td {
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      padding: clamp(0.56rem, 1vw, 0.75rem);
+      text-align: left;
+      vertical-align: top;
+      line-height: 1.52;
+      font-size: clamp(0.84rem, 1.2vw, 1rem);
+    }
+    .compare-table tr:last-child td { border-bottom: 0; }
+    .compare-table th:last-child,
+    .compare-table td:last-child { border-right: 0; }
+
+    .table-head {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.32rem;
+    }
+    .table-link {
+      border: 0;
+      background: transparent;
+      color: #3e4bd5;
+      font-size: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .table-link:hover {
+      color: #2f35a8;
+    }
+
+    .react-diagram,
+    .paper-diagram {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.7rem;
+      margin-top: 0.74rem;
+    }
+    .react-node,
+    .paper-node {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.98);
+      padding: 0.5rem;
+      text-align: center;
+      font-size: var(--small-size);
+      font-weight: 700;
+      color: #2a4d85;
+      position: relative;
+      min-height: clamp(56px, 8vh, 74px);
+      display: grid;
+      place-items: center;
+    }
+    .react-node::after,
+    .paper-node::after {
+      content: "→";
+      position: absolute;
+      right: -0.58rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #7f9fd3;
+      font-weight: 900;
+    }
+    .react-node:last-child::after,
+    .paper-node:last-child::after { content: ""; }
+
+    .icon-round {
+      width: clamp(30px, 2.2vw, 42px);
+      height: clamp(30px, 2.2vw, 42px);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(0.9rem, 1.4vw, 1.15rem);
+      font-weight: 700;
+      color: #fff;
+      margin-right: 0.4rem;
+      flex-shrink: 0;
+    }
+    .icon-chat { background: #da8d00; }
+    .icon-agent { background: #2f6bff; }
+
+    .switch-row {
+      display: flex;
+      gap: 0.65rem;
+      flex-wrap: wrap;
+      margin-top: 0.25rem;
+    }
+
+    .shot-box {
+      border: 1px dashed rgba(47,107,255,0.35);
+      border-radius: 12px;
+      background: rgba(246,250,255,0.9);
+      min-height: clamp(200px, 32vh, 290px);
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: #45679f;
+      font-size: var(--small-size);
+      padding: 0.8rem;
+      margin-top: 0.7rem;
+    }
+    .shot-box.hidden { display: none; }
+    .shot-box img {
+      width: 100%;
+      max-height: min(42vh, 360px);
+      object-fit: contain;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .compare-shot-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.9rem;
+      margin-top: 0.72rem;
+      width: 100%;
+    }
+    .compare-shot-grid .shot-box {
+      min-height: clamp(170px, 25vh, 250px);
+      margin-top: 0;
+    }
+
+    .logo-compare {
+      gap: clamp(1.2rem, 2vw, 1.8rem);
+    }
+
+    .logo-block {
+      display: grid;
+      place-items: start;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.98);
+      min-height: clamp(220px, 32vh, 330px);
+      text-align: left;
+      padding: 1rem 1.05rem;
+      gap: 0.62rem;
+    }
+    .logo-block img {
+      width: clamp(92px, 8.8vw, 148px);
+      height: auto;
+      object-fit: contain;
+      justify-self: center;
+    }
+    .logo-block h3 {
+      width: 100%;
+      text-align: center;
+      font-size: clamp(1.2rem, 2vw, 1.8rem);
+      margin-bottom: 0.12rem;
+    }
+
+    .icon-link-row {
+      display: flex;
+      gap: 0.9rem;
+      flex-wrap: wrap;
+      margin-top: 0.9rem;
+    }
+
+    .icon-link {
+      display: grid;
+      place-items: center;
+      width: clamp(92px, 10vw, 122px);
+      text-decoration: none;
+      gap: 0.35rem;
+      color: #2f5ca5;
+      font-size: var(--small-size);
+      font-weight: 700;
+    }
+
+    .icon-emoji {
+      width: clamp(56px, 5vw, 74px);
+      height: clamp(56px, 5vw, 74px);
+      border-radius: 50%;
+      border: 1px solid rgba(47,107,255,0.3);
+      background: rgba(255,255,255,0.98);
+      display: grid;
+      place-items: center;
+      font-size: clamp(1.35rem, 2.1vw, 2rem);
+      box-shadow: 0 8px 16px rgba(47,107,255,0.12);
+      transition: transform 0.2s ease;
+    }
+    .icon-link:hover .icon-emoji { transform: translateY(-2px); }
+
+    .placeholder {
+      border: 1px dashed rgba(47,107,255,0.35);
+      border-radius: 10px;
+      background: rgba(246,250,255,0.84);
+      padding: 0.65rem;
+      text-align: center;
+      color: #4368a2;
+      font-size: var(--small-size);
+      min-height: 86px;
+      display: grid;
+      place-items: center;
+      margin-top: 0.58rem;
+    }
+
+    .summary-center {
+      display: grid;
+      place-items: center;
+      text-align: center;
+      gap: 0.95rem;
+      align-content: center;
+      padding-top: 0;
+    }
+
+    .summary-center .headline {
+      font-size: clamp(1.35rem, 2.25vw, 2.2rem);
+      color: #1e3f7b;
+      font-weight: 900;
+      max-width: 820px;
+    }
+
+    .summary-lines {
+      margin-top: 0.2rem;
+      display: grid;
+      gap: 0.7rem;
+      width: min(900px, 92%);
+    }
+    .summary-line {
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      border-bottom: 1px dashed rgba(47,107,255,0.3);
+      padding-bottom: 0.45rem;
+      font-size: clamp(1rem, 1.45vw, 1.2rem);
+      color: #2a4f8d;
+    }
+    .summary-line.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .headline-trigger {
+      border: 0;
+      background: transparent;
+      color: #1e3f7b;
+      font: inherit;
+      font-weight: 900;
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 0.2em;
+      padding: 0;
+    }
+
+    .thanks {
+      background: linear-gradient(180deg, #f8fbff 0%, #edf4ff 100%);
+    }
+    .thanks .slide-content {
+      width: min(1480px, 100%);
+    }
+    .thanks-center {
+      text-align: center;
+      display: grid;
+      gap: 0.45rem;
+      align-content: center;
+    }
+    .thanks-center h2 {
+      margin-top: clamp(0.6rem, 1.8vh, 1.2rem);
+      margin-bottom: 0.55rem;
+    }
+    .thanks-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.95rem;
+      align-items: stretch;
+      width: min(1480px, 100%);
+      margin: 0.35rem auto 0 auto;
+    }
+    .thanks-grid .panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 0.34rem;
+      text-align: center;
+      padding: 0.9rem 1.12rem 0.72rem;
+      min-height: clamp(198px, 27vh, 280px);
+      transform: translateY(0);
+    }
+    .thanks-grid .bullet-list {
+      margin-top: 0;
+      gap: 0.18rem;
+      align-items: center;
+    }
+    .thanks-grid .bullet-list li {
+      display: block;
+      text-align: center;
+      line-height: 1.35;
+      font-size: clamp(0.8rem, 0.95vw, 0.92rem);
+    }
+    .thanks-grid .bullet-list li::before {
+      content: "";
+    }
+    .no-dot-list li::before {
+      content: none !important;
+    }
+    .thanks-logo {
+      width: clamp(78px, 6.8vw, 114px);
+      height: auto;
+      object-fit: contain;
+      margin: 0 auto 0.12rem auto;
+    }
+    .my-photo {
+      width: clamp(82px, 7vw, 112px);
+      height: clamp(82px, 7vw, 112px);
+      border-radius: 50%;
+      border: 2px solid rgba(99, 91, 255, 0.25);
+      object-fit: cover;
+      margin: 0 auto 0.12rem auto;
+    }
+    .thanks-note {
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 110px;
+      padding: 0.8rem 1rem;
+      font-size: clamp(1rem, 1.3vw, 1.12rem);
+      line-height: 1.7;
+    }
+
+    .paper-title {
+      font-size: clamp(1.3rem, 2.4vw, 2rem);
+      margin-bottom: 0.18rem;
+      color: #173d79;
+    }
+
+    .mechanism-slide .panel {
+      padding: clamp(1rem, 1.6vw, 1.35rem);
+    }
+    .mechanism-intro {
+      max-width: 960px;
+      margin: 0 auto;
+      text-align: center;
+      line-height: 1.75;
+    }
+    .single-cycle {
+      margin-top: 0.9rem;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.75rem;
+      align-items: center;
+      position: relative;
+      padding-bottom: 1.6rem;
+    }
+    .single-cycle .node {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.98);
+      padding: 0.65rem 0.35rem;
+      text-align: center;
+      font-weight: 700;
+      color: #1f4f9f;
+      min-height: 72px;
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+    .single-cycle .node::after {
+      content: "→";
+      position: absolute;
+      right: -0.62rem;
+      color: #86a3d6;
+      font-weight: 900;
+    }
+    .single-cycle .node:last-child::after {
+      content: "";
+    }
+    .single-cycle::after {
+      content: "↺";
+      position: absolute;
+      right: 0.4rem;
+      bottom: -0.2rem;
+      color: #7e9bca;
+      font-size: 1.25rem;
+      font-weight: 800;
+    }
+    .mechanism-footnote {
+      margin-top: 0.72rem;
+      text-align: center;
+      color: #5c7092;
+      font-size: var(--small-size);
+    }
+
+    .practice-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(2rem, 2.8vw, 2.8rem);
+      align-items: stretch;
+      margin-top: 0.65rem;
+    }
+    .practice-grid .panel:nth-child(3) {
+      grid-column: 1 / -1;
+      max-width: min(760px, 88%);
+      justify-self: center;
+    }
+    .practice-step {
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      pointer-events: none;
+    }
+    .practice-step.show {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .practice-step p + p {
+      margin-top: 1.12rem;
+    }
+    .practice-step h3 {
+      margin-bottom: 1.5rem;
+    }
+    .practice-step p:first-of-type {
+      margin-top: 0;
+    }
+    .practice-step p + p {
+      margin-top: 1.1rem;
+    }
+    .practice-step#practice3 h3 {
+      margin-bottom: 1.5rem;
+    }
+
+    .practice-title-btn {
+      border: 0;
+      background: linear-gradient(135deg, #635bff, #3d74ff);
+      color: #fff;
+      border-radius: 999px;
+      padding: 0.2em 0.72em;
+      font-size: 0.9em;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 8px 16px rgba(99, 91, 255, 0.24);
+    }
+    .practice-link {
+      margin-top: 0.7rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      border: 1px solid rgba(47,107,255,0.32);
+      border-radius: 999px;
+      padding: 0.3rem 0.72rem;
+      text-decoration: none;
+      color: #2d5a9f;
+      font-size: var(--small-size);
+      font-weight: 700;
+      background: rgba(255,255,255,0.95);
+    }
+    .practice-link:hover {
+      background: rgba(245,249,255,1);
+    }
+
+    .centered-panel {
+      text-align: center;
+    }
+    .centered-panel .cols-2 {
+      align-items: stretch;
+    }
+    .centered-panel .panel-soft {
+      text-align: center;
+    }
+
+    /* ===========================================
+       === MOTION ===
+       =========================================== */
+    .reveal {
+      opacity: 0;
+      transform: translateY(22px);
+      transition: opacity var(--duration-normal) var(--ease-out-expo), transform var(--duration-normal) var(--ease-out-expo);
+    }
+    .slide.visible .reveal {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ===========================================
+       === NAV ===
+       =========================================== */
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 0;
+      height: clamp(3px, 0.35vw, 5px);
+      background: #173368;
+      z-index: 999;
+    }
+
+    .nav-dots {
+      position: fixed;
+      left: clamp(0.55rem, 1vw, 0.8rem);
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 0.34rem;
+      z-index: 999;
+    }
+    .nav-dots button {
+      width: clamp(7px, 0.9vw, 11px);
+      height: clamp(7px, 0.9vw, 11px);
+      border-radius: 50%;
+      border: 1px solid rgba(23,51,102,0.45);
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .nav-dots button.active {
+      background: #173368;
+      transform: scale(1.18);
+    }
+
+    .keyboard-hint {
+      position: fixed;
+      right: 0.7rem;
+      bottom: 0.7rem;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.22rem 0.58rem;
+      font-size: var(--small-size);
+      color: #4a5f82;
+      z-index: 999;
+    }
+  
+
+    /* ===== Stripe-inspired Theme Override ===== */
+    :root {
+      --bg-0: #f6f9fc;
+      --bg-1: #edf1ff;
+      --bg-2: #dfe8ff;
+      --text: #0a2540;
+      --muted: #425466;
+      --line: rgba(10, 37, 64, 0.15);
+      --panel: rgba(255, 255, 255, 0.98);
+      --panel-soft: rgba(247, 250, 255, 0.94);
+      --accent: #635bff;
+      --accent-strong: #0a2540;
+    }
+    body {
+      background: #e8efff;
+    }
+    .slide {
+      background:
+        radial-gradient(circle at 0% 0%, rgba(99,91,255,0.18), transparent 42%),
+        radial-gradient(circle at 100% 100%, rgba(11,92,255,0.12), transparent 38%),
+        linear-gradient(160deg, var(--bg-0) 0%, var(--bg-1) 55%, var(--bg-2) 100%);
+    }
+    .cover {
+      background:
+        radial-gradient(circle at 85% 10%, rgba(99,91,255,0.22), transparent 35%),
+        linear-gradient(180deg, #f8faff 0%, #eef2ff 100%);
+    }
+    .cover h1, h1, h2, h3 {
+      color: #0a2540;
+    }
+    .title-action {
+      background: linear-gradient(135deg, #635bff, #3d74ff);
+    }
+    .pill-btn {
+      border-color: rgba(99,91,255,0.45);
+      color: #4138c2;
+    }
+    .progress-bar {
+      background: #635bff;
+    }
+    .nav-dots button.active {
+      background: #635bff;
+    }
+    .icon-chat { background: #f6a00b; }
+    .icon-agent { background: #635bff; }
+
+  </style>
+</head>
+<body>
+  <div class="progress-bar"></div>
+  <nav class="nav-dots"></nav>
+  <div class="keyboard-hint">↑ ↓ / 滚轮</div>
+
+  <!-- Slide 1 -->
+  <section class="slide">
+    <div class="slide-number">01 / 12</div>
+    <div class="slide-content cover">
+      <h1 class="reveal">AI Agent 的机制和实践</h1>
+      <p class="bio reveal">By 小波</p>
+    </div>
+  </section>
+
+  <!-- Slide 2 -->
+  <section class="slide">
+    <div class="slide-number">02 / 12</div>
+    <div class="slide-content">
+      <h2 class="reveal">OpenClaw 为什么火爆</h2>
+      <div class="lobster-wrap reveal">
+        <div class="lobster-card" id="lobsterTrigger">
+          <img src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f99e.svg" alt="小龙虾" />
+        </div>
+        <div style="display:grid; gap:0.7rem;">
+          <div class="panel lobster-step" id="lobsterStep1">
+            <h3 style="margin-bottom:0.3rem;">为什么有热度</h3>
+            <p>OpenClaw 让大家第一次直观感受到，AI 不再只是聊天窗口，而是可以读取文件、发送消息、执行系统命令并自动跑流程的执行系统这种从“回答问题”到“动手做事”的跨越，直接点燃了技术圈讨论</p>
+          </div>
+          <div class="panel lobster-step" id="lobsterStep2">
+            <h3 style="margin-bottom:0.3rem;">风险也在放大</h3>
+            <p>热度上来后，风险也同步放大：假安装包、恶意 GitHub 仓库、钓鱼版本开始出现它被安全圈持续关注，本质上说明 Agent 已进入真实应用阶段，价值与攻击面一起扩大</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 3 -->
+  <section class="slide">
+    <div class="slide-number">03 / 12</div>
+    <div class="slide-content process-layout">
+      <h2 class="reveal">OpenClaw 怎么“<button class="title-action" id="processTrigger" type="button">做事</button>”</h2>
+      <div class="panel reveal">
+        <div class="process-board">
+          <div class="process-loop" id="processLoop"></div>
+          <div class="process-row">
+            <div class="pnode" id="p-op">Operator（操作者）</div>
+            <div class="pline" id="l1"></div>
+            <div class="pnode" id="p-gw">Gateway（网关）</div>
+            <div class="pline" id="l2"></div>
+            <div class="pnode" id="p-ws">WebSocket（通道）</div>
+            <div class="pline" id="l3"></div>
+            <div class="pnode" id="p-node">Node（执行端）</div>
+          </div>
+          <div class="process-return" id="returnLine">反馈结果 -> 返回 Operator</div>
+        </div>
+
+        <div class="process-notes" id="processNotes"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 4 -->
+  <section class="slide">
+    <div class="slide-number">04 / 12</div>
+    <div class="slide-content">
+      <h2 class="reveal">Chatbot vs Agent</h2>
+      <table class="compare-table reveal">
+        <thead>
+          <tr>
+            <th>维度</th>
+            <th>
+              <span class="table-head">
+                <span class="icon-round icon-chat">💬</span>
+                <button class="table-link" id="showChatbotShot" type="button">Chatbot</button>
+              </span>
+            </th>
+            <th>
+              <span class="table-head">
+                <span class="icon-round icon-agent">🤖</span>
+                <button class="table-link" id="showAgentShot" type="button">Agent</button>
+              </span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>核心目标</td><td>把问题回答清楚</td><td>把任务推进到完成</td></tr>
+          <tr><td>交互方式</td><td>你问我答，单轮为主</td><td>按步骤执行，连续迭代</td></tr>
+          <tr><td>行动能力</td><td>主要产出文本，不直接操作系统</td><td>会调工具、会执行动作</td></tr>
+          <tr><td>状态管理</td><td>上下文偏短，常常重新开始</td><td>会保存任务状态和历史</td></tr>
+          <tr><td>输出结果</td><td>一段回答</td><td>动作记录 + 结果</td></tr>
+          <tr><td>评价标准</td><td>回答是否有帮助、是否自然</td><td>任务是否闭环完成，能否复盘</td></tr>
+        </tbody>
+      </table>
+      <div class="compare-shot-grid reveal">
+        <div class="shot-box hidden" id="chatbotShotBox">
+          <img src="chatbot页面.png" alt="Chatbot 页面截图" />
+        </div>
+        <div class="shot-box hidden" id="agentShotBox">
+          <img src="agent页面.png" alt="Agent 页面截图" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 5 -->
+  <section class="slide">
+    <div class="slide-number">05 / 12</div>
+    <div class="slide-content mechanism-slide">
+      <h2 class="reveal">Agent 最小机制</h2>
+      <div class="panel reveal">
+        <p class="mechanism-intro">Agent 最小机制不是由单一作者一次性定义的</p>
+        <p class="mechanism-intro">而是由 ReAct、Toolformer、Reflexion 等研究与工程实践逐步收敛出的共识</p>
+        <p class="mechanism-intro" style="font-size:clamp(1.02rem,1.35vw,1.2rem); font-weight:700; color:#23457e;">系统必须围绕目标行动，并通过反馈和状态持续迭代</p>
+        <div class="single-cycle">
+          <div class="node">Goal</div>
+          <div class="node">Action + Tools</div>
+          <div class="node">Feedback</div>
+          <div class="node">Memory</div>
+          <div class="node">Next Action</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 6 -->
+  <section class="slide">
+    <div class="slide-number">06 / 12</div>
+    <div class="slide-content">
+      <h2 class="reveal">影响 Agent 的理论基础（1）</h2>
+      <div class="cols-2 reveal">
+        <div class="panel">
+          <h3 class="paper-title">ReAct</h3>
+          <p><strong>论文：</strong>ReAct: Synergizing Reasoning and Acting in Language Models</p>
+          <p><strong>作者：</strong>Shunyu Yao 等</p>
+          <p><strong>Source：</strong><a href="https://arxiv.org/abs/2210.03629" target="_blank" rel="noreferrer">arXiv:2210.03629</a></p>
+          <p style="margin-top:0.6rem;">核心思想：把“思考”和“执行”放进同一条链路，让模型不再停留在文本回答，而是通过行动结果不断修正</p>
+          <p style="margin-top:0.6rem;">它被很多后续 Agent 系统当作基线思路：先做、再看、再改，而不是一次性输出最终答案</p>
+        </div>
+        <div class="panel">
+          <h3>应用与影响</h3>
+          <ul class="bullet-list">
+            <li>在交互任务（ALFWorld / WebShop）中显著提升成功率，验证了闭环策略有效性（论文实验）</li>
+            <li>推动了后续 Agent 框架将“思考链 + 工具调用 + 观测反馈”作为标准模式</li>
+            <li>工程上被广泛用作“先推理再执行，再根据结果修正”的模板</li>
+          </ul>
+          <div class="react-diagram">
+            <div class="react-node">Reason</div>
+            <div class="react-node">Act</div>
+            <div class="react-node">Observe</div>
+            <div class="react-node">Re-plan</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 7 -->
+  <section class="slide">
+    <div class="slide-number">07 / 12</div>
+    <div class="slide-content">
+      <h2 class="reveal">影响 Agent 的理论基础（2）</h2>
+      <div class="cols-2 reveal">
+        <div class="panel">
+          <h3 class="paper-title">Toolformer</h3>
+          <p><strong>论文：</strong>Toolformer: Language Models Can Teach Themselves to Use Tools</p>
+          <p><strong>作者：</strong>Timo Schick 等（Meta AI, 2023）</p>
+          <p><strong>Source：</strong><a href="https://arxiv.org/abs/2302.04761" target="_blank" rel="noreferrer">arXiv:2302.04761</a></p>
+          <p>论文结论：通过少量 API 示例进行自监督学习，模型可学会何时调用、如何调用并融合工具结果</p>
+          <div class="paper-diagram">
+            <div class="paper-node">示例</div>
+            <div class="paper-node">候选调用</div>
+            <div class="paper-node">筛选</div>
+            <div class="paper-node">嵌入推理</div>
+          </div>
+          <p style="margin-top:0.7rem;">应用层意义：推动“模型自主工具调用”成为主流能力，影响后续 tool calling 与 agent API 设计</p>
+        </div>
+        <div class="panel">
+          <h3 class="paper-title">Reflexion</h3>
+          <p><strong>论文：</strong>Reflexion: Language Agents with Verbal Reinforcement Learning</p>
+          <p><strong>作者：</strong>Noah Shinn 等（Princeton / DeepMind）</p>
+          <p><strong>Source：</strong><a href="https://arxiv.org/abs/2303.11366" target="_blank" rel="noreferrer">arXiv:2303.11366</a></p>
+          <p>通俗理解：让 Agent 每次做完先“复盘一句话”，把经验写进记忆里，下一次少走弯路</p>
+          <div class="paper-diagram">
+            <div class="paper-node">执行</div>
+            <div class="paper-node">反思</div>
+            <div class="paper-node">写入记忆</div>
+            <div class="paper-node">下轮复用</div>
+          </div>
+          <p style="margin-top:0.7rem;">应用层意义：推动“语言反思 + 记忆复用”成为无重训迭代的重要路线</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 8 -->
+  <section class="slide">
+    <div class="slide-number">08 / 12</div>
+    <div class="slide-content">
+      <h2 class="reveal">Skills 与 MCP</h2>
+      <div class="cols-2 reveal">
+        <div class="panel">
+          <h3>Skills</h3>
+          <p style="margin-top:0.35rem;">把高频任务封装成可复用模块，减少每次从零开始</p>
+          <ul class="bullet-list">
+            <li>搜索</li>
+            <li>代码生成</li>
+            <li>文件处理</li>
+          </ul>
+          <p style="margin-top:0.95rem;">本次 PPT 就是通过 <strong>frontend slides</strong> skill 生成并迭代完成的</p>
+        </div>
+        <div class="panel">
+          <h3>MCP（Model Context Protocol）</h3>
+          <p style="margin-top:0.9rem;">MCP 是连接模型与外部系统的标准协议，可理解为 AI 的 USB-C 接口</p>
+          <p style="margin-top:0.75rem;">它把工具接入方式标准化，降低系统集成成本，提升 Agent 可维护性</p>
+          <p style="margin-top:0.75rem;">Toolformer 解决“会不会用工具”，MCP 解决“工具怎么接入”</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 9 -->
+  <section class="slide">
+    <div class="slide-number">09 / 12</div>
+    <div class="slide-content">
+      <h2 class="reveal">为什么选择 Codex</h2>
+      <div class="cols-2 logo-compare reveal">
+        <div class="logo-block">
+          <img src="open claw.png" alt="OpenClaw logo" />
+          <h3>OpenClaw</h3>
+          <p class="muted">更偏通用运行时，能力强，但对个人实践来说上手和治理成本更高</p>
+        </div>
+        <div class="logo-block">
+          <img src="codex-icon.svg" alt="Codex icon" />
+          <h3>Codex</h3>
+          <p class="muted">更适合我当前目标：理解需求、自主学习、生成代码、运行程序、快速迭代</p>
+          <p class="muted">近期 compute use 上线后，权限更大，执行范围更接近真实电脑协作，可探索屏幕读取与跨应用消息处理（待实践）</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 10 -->
+  <section class="slide">
+    <div class="slide-number">10 / 12</div>
+    <div class="slide-content">
+      <h2 class="reveal"><button class="practice-title-btn" id="practiceTrigger" type="button">Agent 小实践</button></h2>
+      <div class="practice-grid reveal">
+        <div class="panel practice-step" id="practice1">
+          <h3>实践一：协作 ToDoList</h3>
+          <p><strong>我做了什么：</strong>定义目标和字段，明确复盘要看什么</p>
+          <p><strong>Codex 做了什么：</strong>实现结构、统计和周/月复盘展示</p>
+          <a class="practice-link" href="./todolist/index.html">📓 打开 ToDoList 页面</a>
+        </div>
+        <div class="panel practice-step" id="practice2">
+          <h3>实践二：切霉豆腐小游戏</h3>
+          <p><strong>我做了什么：</strong>描述玩法与交互预期</p>
+          <p><strong>Codex 做了什么：</strong>把玩法转成可运行前端游戏逻辑</p>
+          <a class="practice-link" href="./mold-tofu-game/index.html">🥄 打开切霉豆腐页面</a>
+        </div>
+        <div class="panel practice-step" id="practice3">
+          <h3>实践三：Slides 制作</h3>
+          <p>整个 slides 的所有内容、slides 的排版，都由 Codex 完成</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 11 -->
+  <section class="slide">
+    <div class="slide-number">11 / 12</div>
+    <div class="slide-content summary-center">
+      <h2 class="reveal">总结</h2>
+      <p class="headline reveal"><strong>Agent 的核心价值不是更聪明</strong><br/><button class="headline-trigger" id="summaryTrigger" type="button">而是任务闭环，交付结果</button></p>
+      <div class="summary-lines">
+        <div class="summary-line" id="sum1">15年前，互联网让我们可以面向公众表达观点</div>
+        <div class="summary-line" id="sum2">10年前，短视频让我们可以面向公众记录生活</div>
+        <div class="summary-line" id="sum3">现在，AI agent 与 vibe coding 让我们可以面向公众创造产品</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 12 -->
+  <section class="slide thanks">
+    <div class="slide-number">12 / 12</div>
+    <div class="slide-content thanks-center">
+      <h2 class="reveal">Contribution</h2>
+      <div class="thanks-grid reveal">
+        <div class="panel">
+          <img class="thanks-logo" src="codex-icon.svg" alt="Codex icon" />
+          <h3 style="text-align:center;">Codex 负责</h3>
+          <ul class="bullet-list no-dot-list">
+            <li>小游戏实现</li>
+            <li>ToDoList 开发</li>
+            <li>Slides 内容生成与排版迭代</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <img class="my-photo" src="小波.png" alt="小波照片" />
+          <h3 style="text-align:center;">小波负责</h3>
+          <ul class="bullet-list no-dot-list">
+            <li>idea</li>
+            <li>方向</li>
+            <li>决策与验收</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    class SlidePresentation {
+      constructor() {
+        this.slides = Array.from(document.querySelectorAll('.slide'));
+        this.currentSlide = 0;
+        this.progressBar = document.querySelector('.progress-bar');
+        this.navDots = document.querySelector('.nav-dots');
+        this.isScrolling = false;
+
+        this.setupIntersectionObserver();
+        this.setupKeyboardNav();
+        this.setupTouchNav();
+        this.setupWheelNav();
+        this.setupProgressBar();
+        this.setupNavDots();
+        this.setupInteractions();
+      }
+
+      setupIntersectionObserver() {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+              this.currentSlide = this.slides.indexOf(entry.target);
+              this.updateNavDots();
+            }
+          });
+        }, { threshold: 0.55 });
+
+        this.slides.forEach((slide) => observer.observe(slide));
+      }
+
+      setupKeyboardNav() {
+        window.addEventListener('keydown', (e) => {
+          if (['ArrowDown', 'PageDown', ' '].includes(e.key)) {
+            e.preventDefault();
+            this.goToSlide(this.currentSlide + 1);
+          }
+          if (['ArrowUp', 'PageUp'].includes(e.key)) {
+            e.preventDefault();
+            this.goToSlide(this.currentSlide - 1);
+          }
+        });
+      }
+
+      setupTouchNav() {
+        let startY = 0;
+        window.addEventListener('touchstart', (e) => {
+          startY = e.touches[0].clientY;
+        }, { passive: true });
+
+        window.addEventListener('touchend', (e) => {
+          const endY = e.changedTouches[0].clientY;
+          const diff = startY - endY;
+          if (Math.abs(diff) > 50) {
+            if (diff > 0) this.goToSlide(this.currentSlide + 1);
+            else this.goToSlide(this.currentSlide - 1);
+          }
+        }, { passive: true });
+      }
+
+      setupWheelNav() {
+        window.addEventListener('wheel', (e) => {
+          if (this.isScrolling) return;
+          if (Math.abs(e.deltaY) < 20) return;
+          this.isScrolling = true;
+          if (e.deltaY > 0) this.goToSlide(this.currentSlide + 1);
+          else this.goToSlide(this.currentSlide - 1);
+          setTimeout(() => { this.isScrolling = false; }, 420);
+        }, { passive: true });
+      }
+
+      setupProgressBar() {
+        window.addEventListener('scroll', () => {
+          const scrollTop = window.scrollY;
+          const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+          const progress = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+          this.progressBar.style.width = `${progress}%`;
+        });
+      }
+
+      setupNavDots() {
+        this.navDots.innerHTML = '';
+        this.slides.forEach((_, i) => {
+          const dot = document.createElement('button');
+          dot.title = `Go to slide ${i + 1}`;
+          dot.addEventListener('click', () => this.goToSlide(i));
+          this.navDots.appendChild(dot);
+        });
+        this.updateNavDots();
+      }
+
+      updateNavDots() {
+        const dots = this.navDots.querySelectorAll('button');
+        dots.forEach((dot, i) => dot.classList.toggle('active', i === this.currentSlide));
+      }
+
+      goToSlide(index) {
+        if (index < 0 || index >= this.slides.length) return;
+        this.slides[index].scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      setupInteractions() {
+        // Slide 2 lobster click reveal
+        const lobster = document.getElementById('lobsterTrigger');
+        const step1 = document.getElementById('lobsterStep1');
+        const step2 = document.getElementById('lobsterStep2');
+        let lobsterClicks = 0;
+        if (lobster && step1 && step2) {
+          lobster.addEventListener('click', () => {
+            lobsterClicks += 1;
+            if (lobsterClicks >= 1) step1.classList.add('show');
+            if (lobsterClicks >= 2) step2.classList.add('show');
+          });
+        }
+
+        // Slide 3 step-by-step process
+        const processBtn = document.getElementById('processTrigger');
+        const nodes = {
+          op: document.getElementById('p-op'),
+          gw: document.getElementById('p-gw'),
+          ws: document.getElementById('p-ws'),
+          nd: document.getElementById('p-node')
+        };
+        const lines = {
+          l1: document.getElementById('l1'),
+          l2: document.getElementById('l2'),
+          l3: document.getElementById('l3'),
+          ret: document.getElementById('returnLine')
+        };
+        const processLoop = document.getElementById('processLoop');
+        const processNotes = document.getElementById('processNotes');
+
+        let stage = 0;
+        const stageCards = [
+          {
+            tag: 'Step 1',
+            title: 'Operator（操作者）',
+            desc: '用户入口，可以是 CLI、Web 控制台或 App，用来发起任务'
+          },
+          {
+            tag: 'Step 2',
+            title: 'Gateway（网关）',
+            desc: '系统总控台，负责接收请求、统一调度和分发'
+          },
+          {
+            tag: 'Step 3',
+            title: 'WebSocket（通信通道）',
+            desc: '保持实时连接，让指令与结果能双向快速传输'
+          },
+          {
+            tag: 'Step 4',
+            title: 'Node（执行端）',
+            desc: '真正执行动作的设备，负责文件、命令等实际操作'
+          },
+          {
+            tag: 'Step 5',
+            title: 'Feedback（闭环反馈）',
+            desc: '执行结果回传到 Operator，进入下一轮调整与执行'
+          }
+        ];
+
+        const resetProcess = () => {
+          Object.values(nodes).forEach((n) => {
+            n.classList.remove('show');
+            n.classList.remove('active');
+          });
+          Object.values(lines).forEach((l) => l.classList.remove('show'));
+          if (processLoop) {
+            processLoop.classList.remove('show');
+          }
+          if (processNotes) {
+            processNotes.innerHTML = '';
+          }
+        };
+
+        const applyStage = (s) => {
+          resetProcess();
+          if (s >= 1) {
+            nodes.op.classList.add('show', 'active');
+          }
+          if (s >= 2) {
+            nodes.gw.classList.add('show', 'active');
+            lines.l1.classList.add('show');
+          }
+          if (s >= 3) {
+            nodes.ws.classList.add('show', 'active');
+            lines.l2.classList.add('show');
+          }
+          if (s >= 4) {
+            nodes.nd.classList.add('show', 'active');
+            lines.l3.classList.add('show');
+          }
+          if (s >= 5) {
+            if (processLoop) processLoop.classList.add('show');
+            lines.ret.classList.add('show');
+            nodes.op.classList.add('active');
+          }
+          if (s >= 1 && processNotes) {
+            const html = stageCards
+              .slice(0, s)
+              .map((item) => `
+                <div class="process-note show">
+                  <span class="mini-tag">${item.tag}</span>
+                  <h4>${item.title}</h4>
+                  <p>${item.desc}</p>
+                </div>
+              `)
+              .join('');
+            processNotes.innerHTML = html;
+          }
+        };
+
+        if (processBtn) {
+          processBtn.addEventListener('click', () => {
+            stage += 1;
+            if (stage > 5) stage = 0;
+            applyStage(stage);
+          });
+        }
+
+        // Slide 8 screenshot switch
+        const showChatbotShot = document.getElementById('showChatbotShot');
+        const showAgentShot = document.getElementById('showAgentShot');
+        const chatbotShotBox = document.getElementById('chatbotShotBox');
+        const agentShotBox = document.getElementById('agentShotBox');
+        let chatbotVisible = false;
+        let agentVisible = false;
+        if (showChatbotShot && showAgentShot && chatbotShotBox && agentShotBox) {
+          showChatbotShot.addEventListener('click', () => {
+            chatbotVisible = !chatbotVisible;
+            chatbotShotBox.classList.toggle('hidden', !chatbotVisible);
+          });
+          showAgentShot.addEventListener('click', () => {
+            agentVisible = !agentVisible;
+            agentShotBox.classList.toggle('hidden', !agentVisible);
+          });
+        }
+
+        // Slide 10 practice progressive reveal
+        const practiceTrigger = document.getElementById('practiceTrigger');
+        const practiceItems = [
+          document.getElementById('practice1'),
+          document.getElementById('practice2'),
+          document.getElementById('practice3')
+        ];
+        let practiceStep = 0;
+        if (practiceTrigger) {
+          practiceTrigger.addEventListener('click', () => {
+            if (practiceStep < practiceItems.length) {
+              practiceItems[practiceStep].classList.add('show');
+              practiceStep += 1;
+            } else {
+              practiceItems.forEach((item) => item.classList.remove('show'));
+              practiceStep = 0;
+            }
+          });
+        }
+
+        // Slide 11 summary progressive reveal
+        const summaryTrigger = document.getElementById('summaryTrigger');
+        const summaryLines = [
+          document.getElementById('sum1'),
+          document.getElementById('sum2'),
+          document.getElementById('sum3')
+        ];
+        let summaryStep = 0;
+        if (summaryTrigger) {
+          summaryTrigger.addEventListener('click', () => {
+            if (summaryStep < summaryLines.length) {
+              summaryLines[summaryStep].classList.add('show');
+              summaryStep += 1;
+            } else {
+              summaryLines.forEach((line) => line.classList.remove('show'));
+              summaryStep = 0;
+            }
+          });
+        }
+      }
+    }
+
+    new SlidePresentation();
+  </script>
+</body>
+</html>

@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>小波的todolist</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="bg-gradient"></div>
+    <div class="bg-noise"></div>
+
+    <main class="app">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">PERSONAL TODO STUDIO</p>
+          <h1>小波的todolist</h1>
+          <p class="subtitle">把想法落到行动，节奏清晰、状态可控。</p>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <span class="stat-label">总计</span>
+            <span id="stat-total" class="stat-value">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">进行中</span>
+            <span id="stat-active" class="stat-value">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">依赖方</span>
+            <span id="stat-waiting" class="stat-value">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">已完成</span>
+            <span id="stat-done" class="stat-value">0</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="panel create">
+        <div class="panel-header">
+          <h2>快速记录</h2>
+          <p>写清楚下一步动作，比模糊目标更有效。</p>
+        </div>
+        <form id="todo-form" class="todo-form">
+          <div class="field">
+            <label for="title">标题</label>
+            <input id="title" name="title" type="text" placeholder="整理周报数据" required />
+          </div>
+          <div class="field">
+            <label for="project">项目</label>
+            <select id="project" name="project"></select>
+          </div>
+          <div class="field">
+            <label for="notes">备注</label>
+            <textarea id="notes" name="notes" rows="3" placeholder="可以放上下文、链接或说明。"></textarea>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="due">截止日期</label>
+              <input id="due" name="due" type="date" />
+            </div>
+            <div class="field">
+              <label for="priority">优先级</label>
+              <select id="priority" name="priority">
+                <option value="low">低</option>
+                <option value="medium" selected>中</option>
+                <option value="high">高</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="mode">协作模式</label>
+              <select id="mode" name="mode">
+                <option value="solo" selected>Solo</option>
+                <option value="collab">合作</option>
+                <option value="waiting">依赖方</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="partner">协作者 / 依赖人</label>
+              <input id="partner" name="partner" type="text" placeholder="填写姓名或角色" />
+            </div>
+          </div>
+          <button type="submit" class="primary">添加任务</button>
+        </form>
+      </section>
+
+      <section class="panel list">
+        <div class="panel-header">
+          <h2>任务列表</h2>
+          <p id="list-hint">还没有任务，先记录一个吧。</p>
+        </div>
+        <div class="control-row">
+          <div class="filter-group" role="tablist">
+            <button type="button" class="chip active" data-filter="all">全部</button>
+            <button type="button" class="chip" data-filter="active">进行中</button>
+            <button type="button" class="chip" data-filter="completed">已完成</button>
+          </div>
+          <div class="field search">
+            <label for="search">搜索</label>
+            <input id="search" type="search" placeholder="标题、备注、项目或协作人" />
+          </div>
+          <div class="field">
+            <label for="sort">排序</label>
+            <select id="sort">
+              <option value="created-desc" selected>最新</option>
+              <option value="created-asc">最早</option>
+              <option value="due-asc">截止日期</option>
+              <option value="priority-desc">优先级</option>
+            </select>
+          </div>
+        </div>
+        <div id="todo-list" class="todo-list" aria-live="polite"></div>
+      </section>
+
+      <section class="panel review">
+        <div class="panel-header">
+          <h2>周 / 月复盘</h2>
+          <p>挑一个时间段，复盘完成情况与协作节奏。</p>
+        </div>
+        <div class="review-controls">
+          <div class="filter-group" role="tablist">
+            <button type="button" class="chip period-chip active" data-period="week">周</button>
+            <button type="button" class="chip period-chip" data-period="month">月</button>
+          </div>
+          <div class="field">
+            <label for="period-select">时间段</label>
+            <select id="period-select"></select>
+          </div>
+          <div class="review-actions">
+            <button type="button" class="ghost" id="summary-btn">本地总结</button>
+            <button type="button" class="primary" id="ai-summary-btn">AI 总结</button>
+          </div>
+        </div>
+        <details class="ai-config">
+          <summary>AI 配置（本地保存，可选）</summary>
+          <p class="ai-config-note">
+            若配置 Proxy URL，可不在浏览器保存 API Key。未配置代理时会直连 MiniMax。
+          </p>
+          <div class="field-row">
+            <div class="field">
+              <label for="minimax-api-key">MiniMax API Key</label>
+              <input
+                id="minimax-api-key"
+                type="password"
+                placeholder="sk-api-..."
+                autocomplete="off"
+              />
+            </div>
+            <div class="field">
+              <label for="minimax-proxy-url">Proxy URL（可选）</label>
+              <input
+                id="minimax-proxy-url"
+                type="url"
+                placeholder="https://your-proxy.workers.dev/api/summary"
+              />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="minimax-base-url">MiniMax Base URL</label>
+              <input id="minimax-base-url" type="url" placeholder="https://api.minimax.io/v1" />
+            </div>
+            <div class="field">
+              <label for="minimax-model">MiniMax 模型</label>
+              <input id="minimax-model" type="text" placeholder="MiniMax-M2.5" />
+            </div>
+          </div>
+          <div class="review-actions">
+            <button type="button" class="ghost" id="save-ai-config">保存 AI 配置</button>
+            <button type="button" class="ghost" id="clear-ai-config">清除 AI 配置</button>
+          </div>
+          <p id="ai-config-hint" class="muted ai-config-hint"></p>
+        </details>
+        <div id="review-stats" class="review-stats"></div>
+        <div id="summary-output" class="summary-output"></div>
+        <div id="history-list" class="history-list"></div>
+      </section>
+    </main>
+
+    <div id="edit-modal" class="modal" aria-hidden="true">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-title">
+        <div class="modal-header">
+          <h3 id="edit-title">编辑任务</h3>
+          <button type="button" class="icon-button" id="close-modal" aria-label="Close">×</button>
+        </div>
+        <form id="edit-form" class="todo-form">
+          <div class="field">
+            <label for="edit-title-input">标题</label>
+            <input id="edit-title-input" name="title" type="text" required />
+          </div>
+          <div class="field">
+            <label for="edit-project">项目</label>
+            <select id="edit-project" name="project"></select>
+          </div>
+          <div class="field">
+            <label for="edit-notes">备注</label>
+            <textarea id="edit-notes" name="notes" rows="3"></textarea>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="edit-due">截止日期</label>
+              <input id="edit-due" name="due" type="date" />
+            </div>
+            <div class="field">
+              <label for="edit-priority">优先级</label>
+              <select id="edit-priority" name="priority">
+                <option value="low">低</option>
+                <option value="medium">中</option>
+                <option value="high">高</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="edit-mode">协作模式</label>
+              <select id="edit-mode" name="mode">
+                <option value="solo">Solo</option>
+                <option value="collab">合作</option>
+                <option value="waiting">依赖方</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="edit-partner">协作者 / 依赖人</label>
+              <input id="edit-partner" name="partner" type="text" />
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="ghost" id="cancel-edit">取消</button>
+            <button type="submit" class="primary">保存</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

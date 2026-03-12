@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>切霉豆腐</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Work+Sans:wght@300;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="hud">
+    <div class="title">
+      <div class="logo">切霉豆腐</div>
+      <div class="subtitle"></div>
+    </div>
+    <div class="controls">
+      <button id="toggle-sfx" class="pill">音效: 开</button>
+      <button id="restart" class="pill">重新开盆</button>
+    </div>
+  </div>
+
+  <div class="panel" id="season-panel" aria-hidden="true">
+    <div class="panel-title">加调料（选 2~3 种）</div>
+    <div class="season-list" id="season-list"></div>
+    <div class="panel-actions">
+      <button id="shake" class="primary" disabled>摇一摇</button>
+    </div>
+  </div>
+
+  <div class="panel" id="jar-panel" aria-hidden="true">
+    <div class="panel-title">把调好的霉豆腐倒进玻璃罐</div>
+    <div class="panel-actions">
+      <button id="pour" class="primary">开始倒入</button>
+    </div>
+  </div>
+
+  <canvas id="game"></canvas>
+
+  <div class="tip" id="tip">拖动切刀切块</div>
+
+  <div class="modal" id="done-modal" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-title">完成啦</div>
+      <div class="modal-desc">霉豆腐已经装罐</div>
+      <button id="done-restart" class="primary">再来一盆</button>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>

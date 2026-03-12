@@ -1,0 +1,6 @@
+name = "lyx-ai-share-minimax-proxy"
+main = "worker.js"
+compatibility_date = "2026-03-12"
+
+# 可选：如果你只允许你的 GitHub Pages 域名访问，可在 worker.js 里按 Origin 白名单校验。
+
