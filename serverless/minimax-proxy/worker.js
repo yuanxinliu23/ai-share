@@ -1,10 +1,25 @@
 const DEFAULT_BASE_URL = "https://api.minimax.io/v1";
 const DEFAULT_MODEL = "MiniMax-M2.5";
-const AI_SUMMARY_PROMPT =
-  "你是个人任务复盘助手。请用中文输出一段客观、偏积极的总结。" +
-  "总结必须基于事实，不夸大，不使用空泛口号，避免情绪化表达。" +
-  "输出 3-5 句话，包含完成数量、协作/依赖情况、下一步建议。" +
-  "语气稳定专业，避免使用感叹号。信息不足时给出保守建议。";
+const MINIMAX_MODEL_FALLBACKS = ["MiniMax-M2.5"];
+const PROJECT_BACKGROUND =
+  "结构化上墙项目（一期已落地，当前聚焦一期扩量、二期宣发与三期能力建设）。" +
+  "核心目标为三期原子能力建设、推进一期功能扩量、强化二期宣传，同时兼顾周会分享与自我学习。";
+const AI_SUMMARY_PROMPT = `
+你是一位资深AI产品运营专家，擅长通过结构化数据复盘项目进展、提炼经验并制定可落地的优化策略。
+请基于输入的 To do list 完成情况，结合“结构化上墙”项目背景，输出一份兼具战略高度与执行细节的复盘报告。
+
+输出要求：
+1. 用简洁清晰的中文，分模块输出。
+2. 每个模块关键结论请加粗。
+3. 避免空泛描述，每项建议必须对应输入 To do list 中的具体任务或项目目标。
+4. 保持客观，不夸大，不空喊口号。
+
+复盘框架（严格按以下四部分输出）：
+1. 整体进度诊断
+2. 关键成果提炼
+3. 问题与根因分析
+4. 下周计划与策略
+`.trim();
 
 const buildCorsHeaders = (request) => {
   const origin = request.headers.get("Origin") || "*";
@@ -68,40 +83,68 @@ const buildPrompt = (periodLabel, tasks) => {
   const facts = summarizeFacts(tasks);
   return {
     system: AI_SUMMARY_PROMPT,
-    user: `时间段: ${periodLabel}\n事实摘要:\n${facts}\n已完成任务列表:\n${items}`,
+    user:
+      `项目背景：${PROJECT_BACKGROUND}\n` +
+      `复盘时间段：${periodLabel}\n` +
+      `To do list 事实摘要：\n${facts}\n` +
+      `To do list 条目明细：\n${items}\n` +
+      "请按复盘框架输出结构化结论，并确保每条建议对应具体任务。",
   };
 };
 
 const callMinimax = async (env, prompt) => {
   const baseUrl = (env.MINIMAX_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, "");
-  const model = env.MINIMAX_MODEL || DEFAULT_MODEL;
+  const preferredModel = env.MINIMAX_MODEL || DEFAULT_MODEL;
   const apiKey = env.MINIMAX_API_KEY || "";
 
   if (!apiKey) {
     throw new Error("MINIMAX_API_KEY is missing in Worker secret");
   }
 
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: prompt.system },
-        { role: "user", content: prompt.user },
-      ],
-      temperature: 0.8,
-    }),
-  });
+  const candidates = Array.from(new Set([preferredModel, ...MINIMAX_MODEL_FALLBACKS]));
+  let lastDenied = "";
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data.error?.message || data.message || "MiniMax request failed");
+  for (const model of candidates) {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: prompt.system },
+          { role: "user", content: prompt.user },
+        ],
+        temperature: 0.6,
+      }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (response.ok) {
+      return data;
+    }
+
+    const code = data.error?.code || "";
+    const message = data.error?.message || data.message || "MiniMax request failed";
+    if (
+      code === "AccessDenied.Unpurchased" ||
+      code === "access_denied_un_purchased" ||
+      code === "model_not_found" ||
+      code === "InvalidParameter.ModelNotFound"
+    ) {
+      lastDenied = `${model}: ${message}`;
+      continue;
+    }
+    throw new Error(message);
   }
-  return data;
+
+  throw new Error(
+    `No available MiniMax model for this key. Tried: ${candidates.join(", ")}${
+      lastDenied ? `; last error: ${lastDenied}` : ""
+    }`
+  );
 };
 
 export default {

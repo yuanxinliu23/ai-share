@@ -8,6 +8,11 @@ const DEFAULT_AI_CONFIG = {
   model: "MiniMax-M2.5",
 };
 
+const MINIMAX_MODEL_FALLBACKS = ["MiniMax-M2.5"];
+const PROJECT_BACKGROUND =
+  "结构化上墙项目（一期已落地，当前聚焦一期扩量、二期宣发与三期能力建设）。" +
+  "核心目标为三期原子能力建设、推进一期功能扩量、强化二期宣传，同时兼顾周会分享与自我学习。";
+
 const form = document.getElementById("todo-form");
 const titleInput = document.getElementById("title");
 const projectSelect = document.getElementById("project");
@@ -912,11 +917,36 @@ const generateSummaryLocal = (tasks, label) => {
   ].join(" ");
 };
 
-const AI_SUMMARY_PROMPT =
-  "你是个人任务复盘助手。请用中文输出一段客观、偏积极的总结。" +
-  "总结必须基于事实，不夸大，不使用空泛口号，避免情绪化表达。" +
-  "输出 3-5 句话，包含完成数量、协作/依赖情况、下一步建议。" +
-  "语气稳定专业，避免使用感叹号。信息不足时给出保守建议。";
+const AI_SUMMARY_PROMPT = `
+你是一位资深AI产品运营专家，擅长通过结构化数据复盘项目进展、提炼经验并制定可落地的优化策略。
+请基于输入的 To do list 完成情况，结合“结构化上墙”项目背景，输出一份兼具战略高度与执行细节的复盘报告。
+
+输出要求：
+1. 用简洁清晰的中文，分模块输出。
+2. 每个模块关键结论请加粗。
+3. 避免空泛描述，每项建议必须对应输入 To do list 中的具体任务或项目目标。
+4. 保持客观，不夸大，不空喊口号。
+
+复盘框架（严格按以下四部分输出）：
+1. 整体进度诊断
+- 统计 To do list 完成率；
+- 区分“项目核心任务”（数据、功能、原子能力、宣传）与“个人成长任务”（分享、学习）；
+- 标注延期/未完成项及其对项目节点影响。
+
+2. 关键成果提炼
+- 聚焦结构化商详二期进展；
+- 回答数据底表字段新增是否覆盖核心需求、看板修改是否提升可读性；
+- 评估原子能力是否解决一期痛点、功能上线/扩量是否达到覆盖目标；
+- 评估宣传内容是否突出二期差异化价值。
+
+3. 问题与根因分析
+- 针对未完成/低效项定位根因；
+- 重点判断：需求对齐不足、测试资源冲突、宣传未绑定用户场景等。
+
+4. 下周计划与策略
+- 按数据侧、功能侧、原子能力侧、宣传侧给出优先级与行动建议；
+- 给出周会分享主题建议（如“二期数据驱动运营实践”）与学习方向（如“AI产品原子能力设计方法论”）。
+`.trim();
 
 const summarizeFacts = (tasks) => {
   const counts = { high: 0, medium: 0, low: 0 };
@@ -962,8 +992,72 @@ const buildAiPrompt = (periodLabel, tasks) => {
 
   return {
     system: AI_SUMMARY_PROMPT,
-    user: `时间段: ${periodLabel}\n事实摘要:\n${facts}\n已完成任务列表:\n${items}`,
+    user:
+      `项目背景：${PROJECT_BACKGROUND}\n` +
+      `复盘时间段：${periodLabel}\n` +
+      `To do list 事实摘要：\n${facts}\n` +
+      `To do list 条目明细：\n${items}\n` +
+      "请按复盘框架输出结构化结论，并确保每条建议对应具体任务。",
   };
+};
+
+const buildModelCandidates = (preferredModel) => {
+  const preferred = String(preferredModel || "").trim();
+  const ordered = [preferred, ...MINIMAX_MODEL_FALLBACKS].filter(Boolean);
+  return Array.from(new Set(ordered));
+};
+
+const requestMinimaxSummary = async (activeAiConfig, prompt) => {
+  const candidates = buildModelCandidates(activeAiConfig.model);
+  let lastDeniedMessage = "";
+
+  for (const model of candidates) {
+    const payload = {
+      model,
+      messages: [
+        { role: "system", content: prompt.system },
+        { role: "user", content: prompt.user },
+      ],
+      temperature: 0.6,
+    };
+
+    const response = await fetch(`${activeAiConfig.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${activeAiConfig.apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (response.ok) {
+      const summary = data.choices?.[0]?.message?.content || "";
+      return { summary, model };
+    }
+
+    const code = data.error?.code || "";
+    const message = data.error?.message || data.message || "MiniMax 请求失败";
+    if (
+      code === "AccessDenied.Unpurchased" ||
+      code === "access_denied_un_purchased" ||
+      code === "model_not_found" ||
+      code === "InvalidParameter.ModelNotFound"
+    ) {
+      lastDeniedMessage = `${model}: ${message}`;
+      continue;
+    }
+
+    throw new Error(message);
+  }
+
+  throw new Error(
+    `当前 API Key 对默认 MiniMax 模型无可用权限。已尝试：${candidates.join(
+      ", "
+    )}。请在 MiniMax 平台开通模型，或在 AI 配置中改为你已开通的模型。${
+      lastDeniedMessage ? ` 最近一次返回：${lastDeniedMessage}` : ""
+    }`
+  );
 };
 
 const renderReview = () => {
@@ -1029,29 +1123,8 @@ const requestAiSummary = async () => {
       summary = data.summary || data.choices?.[0]?.message?.content || "";
     } else {
       const prompt = buildAiPrompt(period.label, taskPayload);
-      const payload = {
-        model: activeAiConfig.model,
-        messages: [
-          { role: "system", content: prompt.system },
-          { role: "user", content: prompt.user },
-        ],
-        temperature: 0.8,
-      };
-
-      const response = await fetch(`${activeAiConfig.baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${activeAiConfig.apiKey}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.error?.message || data.message || "MiniMax 请求失败");
-      }
-      summary = data.choices?.[0]?.message?.content || "";
+      const result = await requestMinimaxSummary(activeAiConfig, prompt);
+      summary = result.summary;
     }
 
     summaryOutput.textContent = summary || "AI 没有返回内容。";
